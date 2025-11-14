@@ -1,0 +1,5 @@
+{
+  "_comment": "This file maps measure aliases to their JSON configuration files",
+  "_format": "alias (case-insensitive): filename.json",
+  "_auto_generated": "This file is automatically updated when measure JSONs are scanned or uploaded"
+}
