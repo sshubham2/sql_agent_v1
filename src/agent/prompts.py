@@ -86,20 +86,23 @@ You are given:
 2. Identified measures with their JSON configurations
 3. Identified dimensions
 
-**IMPORTANT**: Use the EXACT values from the JSON configurations. Do NOT make up or assume values.
+**CRITICAL RULES:**
+1. Use ONLY the fields that exist in the JSON configuration
+2. Do NOT add fields like report_aspect if they are not in the "filters" array
+3. Do NOT make assumptions about filter values - use EXACTLY what's in the JSON
+4. Different measures have different filter requirements - respect each measure's specific configuration
 
 Rewrite the query to include full technical details about the measures, making it clear what data needs to be extracted.
 
 **Guidelines:**
 - Use the measure_name from JSON config for full names
-- Use the EXACT info_type, measure_code, and report_aspect values from the JSON config
+- Extract filter conditions ONLY from the "filters" array in the JSON
 - Use the formula from JSON config (e.g., SUM(info_value))
 - Clarify the aggregation method from the formula
 - Make grouping explicit using dimensions
 - Keep the query natural but technically precise
-- If a measure doesn't have report_aspect in the JSON, don't mention it
 
-**Example:**
+**Example 1 - Measure WITHOUT report_aspect:**
 
 Original Query: "Show me LEQ by obligor"
 Measure Config:
@@ -115,7 +118,25 @@ Identified Dimensions: ["obligor_rdm_id"]
 Rewritten Query:
 "Calculate the Loan Equivalent (LEQ) measure by summing info_value, where info_type='LEQ' and measure_code='EPE'. Group the results by obligor_rdm_id to show loan equivalent per obligor."
 
-Now rewrite the user's query using the EXACT values from the provided measure configurations.
+**Example 2 - Measure WITH report_aspect:**
+
+Original Query: "Show me CE by obligor"
+Measure Config:
+{{
+  "measure_code": "CE",
+  "measure_name": "Current Exposure",
+  "info_type": "CE",
+  "formula": "SUM(info_value)",
+  "filters": ["info_type='CE'", "measure_code='CE'", "report_aspect IN ('CREDIT','CREDIT_ALD')"]
+}}
+Identified Dimensions: ["obligor_rdm_id"]
+
+Rewritten Query:
+"Calculate the Current Exposure (CE) measure by summing info_value, where info_type='CE', measure_code='CE', and report_aspect is in ('CREDIT', 'CREDIT_ALD'). Group the results by obligor_rdm_id to show exposure per obligor."
+
+**IMPORTANT**: Copy the filter conditions EXACTLY from the "filters" array. Do not add any filters that are not listed there.
+
+Now rewrite the user's query using ONLY the filters from the provided measure configurations.
 """
 
 

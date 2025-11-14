@@ -120,16 +120,26 @@ def rewrite_query_node(state: AgentState) -> AgentState:
     measure_configs = state.get('measure_configs', {})
 
     # Prepare context for LLM with actual JSON configs
-    configs_text = json.dumps(measure_configs, indent=2)
+    # Extract ONLY the filters array to emphasize what should be used
+    context_parts = [
+        f"Original Query: {user_query}",
+        f"Identified Measures: {', '.join(measures)}",
+        f"Identified Dimensions: {', '.join(dimensions)}",
+        "",
+        "Measure Configurations:",
+    ]
 
-    context = f"""
-Original Query: {user_query}
-Identified Measures: {', '.join(measures)}
-Identified Dimensions: {', '.join(dimensions)}
+    for measure_name, config in measure_configs.items():
+        context_parts.append(f"\n{measure_name}:")
+        context_parts.append(f"  - measure_name: {config.get('measure_name', '')}")
+        context_parts.append(f"  - measure_code: {config.get('measure_code', '')}")
+        context_parts.append(f"  - info_type: {config.get('info_type', '')}")
+        context_parts.append(f"  - formula: {config.get('formula', '')}")
+        context_parts.append(f"  - filters (USE ONLY THESE): {config.get('filters', [])}")
 
-Measure Configurations (use EXACT values from these):
-{configs_text}
-"""
+    context_parts.append("\nREMEMBER: Use ONLY the filters listed above. Do not add any additional filter conditions.")
+
+    context = "\n".join(context_parts)
 
     messages = [
         SystemMessage(content=QUERY_REWRITE_PROMPT),
