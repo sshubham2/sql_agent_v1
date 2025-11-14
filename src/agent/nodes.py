@@ -84,10 +84,13 @@ def identify_measures_node(state: AgentState) -> AgentState:
         parsed = json.loads(response_text)
 
         state['identified_measures'] = parsed.get('measures', [])
-        state['identified_dimensions'] = parsed.get('dimensions', [])
+        state['group_by_dimensions'] = parsed.get('group_by', [])
+        state['user_filters'] = parsed.get('filters', [])
+        state['identified_dimensions'] = state['group_by_dimensions']  # Backward compatibility
 
         print(f"Identified Measures: {state['identified_measures']}")
-        print(f"Identified Dimensions: {state['identified_dimensions']}")
+        print(f"Group By Dimensions: {state['group_by_dimensions']}")
+        print(f"User Filters: {state['user_filters']}")
 
     except json.JSONDecodeError as e:
         print(f"Error parsing LLM response: {e}")
@@ -116,7 +119,8 @@ def rewrite_query_node(state: AgentState) -> AgentState:
 
     user_query = state['user_query']
     measures = state.get('identified_measures', [])
-    dimensions = state.get('identified_dimensions', [])
+    group_by = state.get('group_by_dimensions', [])
+    user_filters = state.get('user_filters', [])
     measure_configs = state.get('measure_configs', {})
 
     # Prepare context for LLM with actual JSON configs
@@ -124,7 +128,8 @@ def rewrite_query_node(state: AgentState) -> AgentState:
     context_parts = [
         f"Original Query: {user_query}",
         f"Identified Measures: {', '.join(measures)}",
-        f"Identified Dimensions: {', '.join(dimensions)}",
+        f"Group By Dimensions: {', '.join(group_by)}",
+        f"User Filter Conditions: {user_filters}",
         "",
         "Measure Configurations:",
     ]
@@ -137,7 +142,7 @@ def rewrite_query_node(state: AgentState) -> AgentState:
         context_parts.append(f"  - formula: {config.get('formula', '')}")
         context_parts.append(f"  - filters (USE ONLY THESE): {config.get('filters', [])}")
 
-    context_parts.append("\nREMEMBER: Use ONLY the filters listed above. Do not add any additional filter conditions.")
+    context_parts.append("\nREMEMBER: Use ONLY the filters from measure config. User filter conditions should also be included in the WHERE clause.")
 
     context = "\n".join(context_parts)
 

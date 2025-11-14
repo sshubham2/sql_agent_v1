@@ -10,7 +10,9 @@ class AgentState(TypedDict):
 
     # Identification phase
     identified_measures: List[str]
-    identified_dimensions: List[str]
+    identified_dimensions: List[str]  # For backward compatibility
+    group_by_dimensions: List[str]  # Columns to GROUP BY
+    user_filters: List[Dict]  # User-specified WHERE filters [{column, value}]
 
     # Query rewrite phase
     rewritten_query: str

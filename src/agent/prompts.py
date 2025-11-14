@@ -40,22 +40,26 @@ To extract any measure, you need 3 pieces of information:
 MEASURE_IDENTIFICATION_PROMPT = f"""
 {TABLE_SCHEMA_PROMPT}
 
-## Your Task: Identify Measures and Dimensions
+## Your Task: Identify Measures, Grouping Dimensions, and Filters
 
 You are analyzing a user's natural language query to identify:
-1. **Measures**: Specific metrics being requested (e.g., Current Exposure, EAD)
-2. **Dimensions**: Attributes to group or filter by (e.g., obligor, product, date)
+1. **Measures**: Specific metrics being requested (e.g., Current Exposure, EAD, LEQ)
+2. **Group By Dimensions**: Attributes to group results by (indicated by "by", "grouped by", "per")
+3. **Filter Conditions**: Specific values to filter on (indicated by "for", "where", "on", "as of")
 
 **Guidelines:**
-- Prefer standard measure codes when possible (CE instead of "Current Exposure")
-- Look for keywords indicating aggregation (sum, total, count, average)
-- Identify grouping dimensions (by obligor, by product, etc.)
-- Identify filtering dimensions (where, for specific, only)
+- Prefer standard measure codes when possible (CE, LEQ, EAD instead of full names)
+- Group By: Look for keywords like "by obligor", "by product", "grouped by"
+- Filters: Look for specific values like "for OTC products", "on 30th Sep", "where legal_entity = XYZ"
 
 **Output Format (JSON):**
 {{
-  "measures": ["CE", "EAD"],
-  "dimensions": ["obligor_rdm_id", "product_group_code", "legal_entity"]
+  "measures": ["CE"],
+  "group_by": ["obligor_rdm_id"],
+  "filters": [
+    {{"column": "product_group_code", "value": "OTC"}},
+    {{"column": "report_date", "value": "2024-09-30"}}
+  ]
 }}
 
 **Examples:**
@@ -64,14 +68,29 @@ User Query: "Show me current exposure by obligor"
 Output:
 {{
   "measures": ["CE"],
-  "dimensions": ["obligor_rdm_id"]
+  "group_by": ["obligor_rdm_id"],
+  "filters": []
 }}
 
-User Query: "What is the total CE and EAD for internal products grouped by legal entity?"
+User Query: "Give me LEQ for OTC products on 30th Sep"
 Output:
 {{
-  "measures": ["CE", "EAD"],
-  "dimensions": ["legal_entity", "is_internal"]
+  "measures": ["LEQ"],
+  "group_by": [],
+  "filters": [
+    {{"column": "product_group_code", "value": "OTC"}},
+    {{"column": "report_date", "value": "2024-09-30"}}
+  ]
+}}
+
+User Query: "What is the total CE for internal products grouped by legal entity?"
+Output:
+{{
+  "measures": ["CE"],
+  "group_by": ["legal_entity"],
+  "filters": [
+    {{"column": "is_internal", "value": "1"}}
+  ]
 }}
 
 Now analyze the user's query and return ONLY the JSON output.

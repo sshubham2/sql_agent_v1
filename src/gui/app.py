@@ -205,6 +205,8 @@ class SQLAgentGUI:
             'connection_string': connection_string,  # Pass connection string through state
             'identified_measures': [],
             'identified_dimensions': [],
+            'group_by_dimensions': [],
+            'user_filters': [],
             'rewritten_query': '',
             'user_confirmed_query': '',
             'measure_configs': {},
@@ -350,9 +352,12 @@ class SQLAgentGUI:
 
                 elif msg_type == 'identified':
                     measures = ', '.join(data.get('identified_measures', []))
-                    dimensions = ', '.join(data.get('identified_dimensions', []))
+                    group_by = ', '.join(data.get('group_by_dimensions', []))
+                    filters = data.get('user_filters', [])
+                    filter_text = ', '.join([f"{f['column']}={f['value']}" for f in filters]) if filters else "None"
+
                     self.identification_label.config(
-                        text=f"Measures: {measures} | Dimensions: {dimensions}",
+                        text=f"Measures: {measures} | Group By: {group_by or 'None'} | Filters: {filter_text}",
                         foreground="black"
                     )
 
