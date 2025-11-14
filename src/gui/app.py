@@ -189,10 +189,14 @@ class SQLAgentGUI:
         # Clear previous results
         self.clear_results()
 
+        # Get connection string from environment
+        connection_string = os.getenv('DB_CONNECTION_STRING', '')
+
         # Create initial state
         initial_state = {
             'user_query': query,
             'sql_review_enabled': self.sql_review_var.get(),
+            'connection_string': connection_string,  # Pass connection string through state
             'identified_measures': [],
             'identified_dimensions': [],
             'rewritten_query': '',
@@ -247,7 +251,16 @@ class SQLAgentGUI:
 
             self.message_queue.put(('identified', state))
 
-            # Node 3: Rewrite query
+            # Node 3: JSON Lookup (MOVED BEFORE REWRITE)
+            self.message_queue.put(('status', 'Loading measure configurations...'))
+            state = nodes.json_lookup_node(state)
+            self.current_state = state
+            if state.get('error'):
+                self.message_queue.put(('error', state['error']))
+                return
+
+            # Node 4: Rewrite query (NOW HAS JSON CONFIGS)
+            self.message_queue.put(('status', 'Rewriting query with measure details...'))
             state = nodes.rewrite_query_node(state)
             if state.get('error'):
                 self.message_queue.put(('error', state['error']))
@@ -255,7 +268,7 @@ class SQLAgentGUI:
 
             self.message_queue.put(('rewritten', state))
 
-            # Node 4: Wait for human confirmation (handled by GUI)
+            # Node 5: Wait for human confirmation (handled by GUI)
             self.message_queue.put(('wait_confirm_query', state))
             # Thread will pause here, resumed by confirm button
 
@@ -271,16 +284,8 @@ class SQLAgentGUI:
             try:
                 state = self.current_state.copy()
 
-                # Node 5: JSON Lookup
-                state = nodes.json_lookup_node(state)
-                self.current_state = state
-                if state.get('error'):
-                    self.message_queue.put(('error', state['error']))
-                    return
-
-                self.message_queue.put(('status', 'Measure configurations loaded'))
-
-                # Node 6: SQL Generation
+                # Node 6: SQL Generation (JSON already loaded in earlier step)
+                self.message_queue.put(('status', 'Generating SQL statement...'))
                 state = nodes.sql_generation_node(state)
                 self.current_state = state
                 if state.get('error'):
@@ -390,7 +395,7 @@ class SQLAgentGUI:
 
         self.confirm_query_btn.config(state=tk.DISABLED)
         self.rewritten_text.config(state=tk.DISABLED)
-        self.update_status("Query confirmed, loading measure configurations...")
+        self.update_status("Query confirmed, generating SQL...")
 
         # Continue workflow
         self.continue_workflow_after_query_confirmation()

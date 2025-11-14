@@ -102,10 +102,10 @@ def identify_measures_node(state: AgentState) -> AgentState:
 # Node 3: Rewrite Query
 def rewrite_query_node(state: AgentState) -> AgentState:
     """
-    Rewrite user query with detailed measure information
+    Rewrite user query with detailed measure information using JSON configs
 
     Args:
-        state: Current agent state
+        state: Current agent state (should have measure_configs loaded)
 
     Returns:
         Updated state with rewritten_query
@@ -117,12 +117,18 @@ def rewrite_query_node(state: AgentState) -> AgentState:
     user_query = state['user_query']
     measures = state.get('identified_measures', [])
     dimensions = state.get('identified_dimensions', [])
+    measure_configs = state.get('measure_configs', {})
 
-    # Prepare context for LLM
+    # Prepare context for LLM with actual JSON configs
+    configs_text = json.dumps(measure_configs, indent=2)
+
     context = f"""
 Original Query: {user_query}
 Identified Measures: {', '.join(measures)}
 Identified Dimensions: {', '.join(dimensions)}
+
+Measure Configurations (use EXACT values from these):
+{configs_text}
 """
 
     messages = [
@@ -344,13 +350,16 @@ def execute_and_export_node(state: AgentState) -> AgentState:
     print(f"Executing SQL:\n{sql}")
 
     # Get database connection string
-    connection_string = os.getenv('DB_CONNECTION_STRING', '')
+    # Check state first, then environment variable
+    connection_string = state.get('connection_string') or os.getenv('DB_CONNECTION_STRING', '')
 
     if not connection_string:
-        error_msg = "Database connection string not configured in .env file"
+        error_msg = "Database connection string not configured. Please set DB_CONNECTION_STRING in .env file or provide connection_string in state."
         print(f"ERROR: {error_msg}")
         state['error'] = error_msg
         return state
+
+    print(f"Using connection: {connection_string[:20]}...")
 
     try:
         # Connect and execute

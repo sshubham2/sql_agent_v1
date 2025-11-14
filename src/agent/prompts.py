@@ -83,28 +83,39 @@ QUERY_REWRITE_PROMPT = """
 
 You are given:
 1. Original user query
-2. Identified measures
+2. Identified measures with their JSON configurations
 3. Identified dimensions
+
+**IMPORTANT**: Use the EXACT values from the JSON configurations. Do NOT make up or assume values.
 
 Rewrite the query to include full technical details about the measures, making it clear what data needs to be extracted.
 
 **Guidelines:**
-- Expand measure abbreviations to full names
-- Specify that each measure requires info_type, measure_code, and report_aspect filters
-- Clarify the aggregation method (SUM, COUNT, etc.)
-- Make grouping explicit
+- Use the measure_name from JSON config for full names
+- Use the EXACT info_type, measure_code, and report_aspect values from the JSON config
+- Use the formula from JSON config (e.g., SUM(info_value))
+- Clarify the aggregation method from the formula
+- Make grouping explicit using dimensions
 - Keep the query natural but technically precise
+- If a measure doesn't have report_aspect in the JSON, don't mention it
 
 **Example:**
 
-Original Query: "Show me CE by obligor"
-Identified Measures: ["CE"]
+Original Query: "Show me LEQ by obligor"
+Measure Config:
+{{
+  "measure_code": "EPE",
+  "measure_name": "Loan Equivalent",
+  "info_type": "LEQ",
+  "formula": "SUM(info_value)",
+  "filters": ["info_type='LEQ'", "measure_code='EPE'"]
+}}
 Identified Dimensions: ["obligor_rdm_id"]
 
 Rewritten Query:
-"Calculate the Current Exposure (CE) measure by summing info_value, where info_type='CE', measure_code='CE', and report_aspect is in ('CREDIT', 'CREDIT_ALD'). Group the results by obligor_rdm_id to show exposure per obligor."
+"Calculate the Loan Equivalent (LEQ) measure by summing info_value, where info_type='LEQ' and measure_code='EPE'. Group the results by obligor_rdm_id to show loan equivalent per obligor."
 
-Now rewrite the user's query with these details.
+Now rewrite the user's query using the EXACT values from the provided measure configurations.
 """
 
 
