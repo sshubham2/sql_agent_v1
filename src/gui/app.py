@@ -215,7 +215,7 @@ class SQLAgentGUI:
         """Run workflow in background thread"""
         try:
             # Import here to avoid circular imports
-            from ..agent.graph import create_workflow
+            from agent.graph import create_workflow
 
             workflow = create_workflow()
 
@@ -232,7 +232,7 @@ class SQLAgentGUI:
     def simulate_workflow(self, state):
         """Simulate workflow execution with GUI updates"""
         # Import nodes
-        from ..agent import nodes
+        from agent import nodes
 
         try:
             # Node 1: Input
@@ -264,14 +264,16 @@ class SQLAgentGUI:
 
     def continue_workflow_after_query_confirmation(self):
         """Continue workflow after query confirmation"""
-        from ..agent import nodes
+        from agent import nodes
 
         def continue_thread():
+            state = None
             try:
-                state = self.current_state
+                state = self.current_state.copy()
 
                 # Node 5: JSON Lookup
                 state = nodes.json_lookup_node(state)
+                self.current_state = state
                 if state.get('error'):
                     self.message_queue.put(('error', state['error']))
                     return
@@ -280,6 +282,7 @@ class SQLAgentGUI:
 
                 # Node 6: SQL Generation
                 state = nodes.sql_generation_node(state)
+                self.current_state = state
                 if state.get('error'):
                     self.message_queue.put(('error', state['error']))
                     return
@@ -295,30 +298,35 @@ class SQLAgentGUI:
                     self.execute_workflow(state)
 
             except Exception as e:
-                self.message_queue.put(('error', str(e)))
+                import traceback
+                error_details = f"{str(e)}\n{traceback.format_exc()}"
+                self.message_queue.put(('error', error_details))
 
         threading.Thread(target=continue_thread).start()
 
     def execute_workflow(self, state):
         """Execute the final SQL query"""
-        from ..agent import nodes
+        from agent import nodes
 
-        def execute_thread():
+        def execute_thread(state_to_execute):
             try:
                 # Node 8: Execute and export
-                state = nodes.execute_and_export_node(state)
+                final_state = nodes.execute_and_export_node(state_to_execute)
+                self.current_state = final_state
 
-                if state.get('error'):
-                    self.message_queue.put(('error', state['error']))
+                if final_state.get('error'):
+                    self.message_queue.put(('error', final_state['error']))
                     return
 
-                self.message_queue.put(('results', state))
+                self.message_queue.put(('results', final_state))
                 self.message_queue.put(('status', 'Query executed successfully!'))
 
             except Exception as e:
-                self.message_queue.put(('error', str(e)))
+                import traceback
+                error_details = f"{str(e)}\n{traceback.format_exc()}"
+                self.message_queue.put(('error', error_details))
 
-        threading.Thread(target=execute_thread).start()
+        threading.Thread(target=execute_thread, args=(state.copy(),)).start()
 
     def check_queue(self):
         """Check message queue for updates from workflow thread"""
@@ -473,7 +481,7 @@ class SQLAgentGUI:
                 shutil.copy(file_path, dest_path)
 
                 # Rescan directory
-                from ..utils.json_loader import scan_measures_directory
+                from utils.json_loader import scan_measures_directory
                 scan_measures_directory()
 
                 messagebox.showinfo("Success", f"Measure JSON uploaded:\n{Path(file_path).name}")

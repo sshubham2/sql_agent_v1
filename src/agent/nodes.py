@@ -5,14 +5,14 @@ from typing import Dict, Any
 from langchain_openai import ChatOpenAI
 from langchain.schema import HumanMessage, SystemMessage
 
-from .state import AgentState
-from .prompts import (
+from agent.state import AgentState
+from agent.prompts import (
     MEASURE_IDENTIFICATION_PROMPT,
     QUERY_REWRITE_PROMPT,
     SQL_GENERATION_PROMPT
 )
-from ..utils.json_loader import MeasureJSONLoader
-from ..database.connection import DatabaseConnection
+from utils.json_loader import MeasureJSONLoader
+from database.connection import DatabaseConnection
 
 
 # Initialize LLM (will be configured in main)
@@ -276,7 +276,7 @@ Generate the SQL statement following the constraints in the system prompt.
         print(f"Generated SQL:\n{sql}")
 
         # Validate SQL
-        from ..database.connection import DatabaseConnection
+        from database.connection import DatabaseConnection
         temp_conn = DatabaseConnection("")  # Just for validation
         is_valid, error_msg = temp_conn.validate_sql(sql)
 
