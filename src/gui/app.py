@@ -61,10 +61,16 @@ class SQLAgentGUI:
         main_frame.rowconfigure(current_row, weight=0)
         current_row += 1
 
-        # Submit button
-        self.submit_btn = ttk.Button(main_frame, text="Submit Query", command=self.submit_query)
-        self.submit_btn.grid(row=current_row, column=0, sticky=tk.W, pady=(0, 15))
+        # Submit and Reset button frame
+        button_frame = ttk.Frame(main_frame)
+        button_frame.grid(row=current_row, column=0, sticky=tk.W, pady=(0, 15))
         current_row += 1
+
+        self.submit_btn = ttk.Button(button_frame, text="Submit Query", command=self.submit_query)
+        self.submit_btn.grid(row=0, column=0, sticky=tk.W, padx=(0, 10))
+
+        self.reset_btn = ttk.Button(button_frame, text="New Query / Reset", command=self.reset_workflow)
+        self.reset_btn.grid(row=0, column=1, sticky=tk.W)
 
         # === Identification Display ===
         ttk.Label(main_frame, text="Identified Measures & Dimensions:", font=('Arial', 10, 'bold')).grid(
@@ -508,6 +514,27 @@ class SQLAgentGUI:
         self.export_btn.config(state=tk.DISABLED)
         self.confirm_query_btn.config(state=tk.DISABLED)
         self.confirm_sql_btn.config(state=tk.DISABLED)
+
+    def reset_workflow(self):
+        """Reset the entire workflow for a new query"""
+        # Clear all displays
+        self.clear_results()
+
+        # Clear query text
+        self.query_text.delete("1.0", tk.END)
+
+        # Reset state
+        self.current_state = {}
+
+        # Enable submit button
+        self.submit_btn.config(state=tk.NORMAL)
+
+        # Update status
+        self.update_status("Ready for new query")
+
+        print("\n" + "=" * 60)
+        print("WORKFLOW RESET - Ready for new query")
+        print("=" * 60)
 
 
 def launch_gui(workflow_runner=None):
