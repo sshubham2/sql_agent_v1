@@ -31,9 +31,9 @@ To extract any measure, you need 3 pieces of information:
 - [Additional combinations to be added by user]
 
 **Important Notes:**
-- Always filter by all three attributes (info_type, measure_code, report_aspect) for accurate results
+- Always filter by the required attributes (info_type, measure_code, and optionally report_aspect) as specified in the measure configuration
 - Use the formula specified in the measure configuration (typically SUM(info_value))
-- Default grouping columns ensure proper aggregation
+- GROUP BY only the dimensions explicitly requested by the user
 """
 
 
@@ -44,13 +44,31 @@ MEASURE_IDENTIFICATION_PROMPT = f"""
 
 You are analyzing a user's natural language query to identify:
 1. **Measures**: Specific metrics being requested (e.g., Current Exposure, EAD, LEQ)
-2. **Group By Dimensions**: Attributes to group results by (indicated by "by", "grouped by", "per")
-3. **Filter Conditions**: Specific values to filter on (indicated by "for", "where", "on", "as of")
+2. **Group By Dimensions**: Attributes to group results by (show data breakdown)
+3. **Filter Conditions**: Specific values to filter on (narrow down data)
+
+**CRITICAL RULES - GROUP BY vs FILTER:**
+
+**GROUP BY** (when user wants to see data breakdown):
+- Keywords: "by", "per", "grouped by", "for each", "breakdown by"
+- Plural mentions WITHOUT specific value: "for products", "for obligors", "and dates"
+- Multiple dimensions: "by product and date", "for products and entities"
+- Example: "for products" (plural, no specific value) → GROUP BY product_group_code
+- Example: "by obligor and date" → GROUP BY obligor_rdm_id, report_date
+
+**FILTER** (when user specifies a particular value):
+- Specific values mentioned: "for OTC product", "on 30th Sep", "where entity = ABC"
+- Keywords with values: "where", "on", "as of", "for [specific value]"
+- Singular with specific identifier: "for OTC", "on Sep 30", "internal products"
+- Example: "for OTC product" (specific value) → FILTER product_group_code = 'OTC'
+- Example: "on 30th Sep" (specific date) → FILTER report_date = '2024-09-30'
 
 **Guidelines:**
 - Prefer standard measure codes when possible (CE, LEQ, EAD instead of full names)
-- Group By: Look for keywords like "by obligor", "by product", "grouped by"
-- Filters: Look for specific values like "for OTC products", "on 30th Sep", "where legal_entity = XYZ"
+- If dimension mentioned WITHOUT specific value → GROUP BY
+- If dimension mentioned WITH specific value → FILTER
+- "for products and dates" = GROUP BY both (no values specified)
+- "for OTC product on 30th Sep" = FILTER both (values specified)
 
 **Output Format (JSON):**
 {{
@@ -73,6 +91,7 @@ Output:
 }}
 
 User Query: "Give me LEQ for OTC products on 30th Sep"
+Explanation: "OTC" is a specific value (FILTER), "30th Sep" is a specific date (FILTER)
 Output:
 {{
   "measures": ["LEQ"],
@@ -83,13 +102,45 @@ Output:
   ]
 }}
 
+User Query: "Give me LEQ for OTC products and cob date"
+Explanation: "OTC" is specific (FILTER), but "cob date" with no value means show breakdown BY date (GROUP BY)
+Output:
+{{
+  "measures": ["LEQ"],
+  "group_by": ["report_date"],
+  "filters": [
+    {{"column": "product_group_code", "value": "OTC"}}
+  ]
+}}
+
+User Query: "Give me LEQ for products and cob date"
+Explanation: "products" (plural, no value) = GROUP BY, "cob date" (no value) = GROUP BY
+Output:
+{{
+  "measures": ["LEQ"],
+  "group_by": ["product_group_code", "report_date"],
+  "filters": []
+}}
+
 User Query: "What is the total CE for internal products grouped by legal entity?"
+Explanation: "internal" is specific (FILTER), "grouped by legal entity" = GROUP BY
 Output:
 {{
   "measures": ["CE"],
   "group_by": ["legal_entity"],
   "filters": [
     {{"column": "is_internal", "value": "1"}}
+  ]
+}}
+
+User Query: "Show me EAD by product and obligor for 30th Sep"
+Explanation: "by product and obligor" = GROUP BY both, "30th Sep" is specific date (FILTER)
+Output:
+{{
+  "measures": ["EAD"],
+  "group_by": ["product_group_code", "obligor_rdm_id"],
+  "filters": [
+    {{"column": "report_date", "value": "2024-09-30"}}
   ]
 }}
 
@@ -173,7 +224,7 @@ Generate a SQL SELECT statement that:
 - Uses ONLY SELECT, WHERE, GROUP BY, and ORDER BY clauses
 - Applies the formula from measure config (e.g., SUM(info_value))
 - Includes all required filters from measure config
-- Groups by default_group_by columns + user-requested dimensions
+- Groups by ONLY the user-requested dimensions (if any)
 - Uses proper SQL syntax for MySQL
 
 **IMPORTANT CONSTRAINTS:**
@@ -181,6 +232,8 @@ Generate a SQL SELECT statement that:
 - NO subqueries unless absolutely necessary
 - Use clear column aliases for calculated measures
 - Ensure all filters are properly combined with AND
+- CRITICAL: Use ONLY the dimensions explicitly requested by the user in GROUP BY clause
+- Do NOT add default_group_by columns unless the user specifically requested them
 
 **SQL Format:**
 ```sql
@@ -193,29 +246,47 @@ GROUP BY [all_grouping_columns]
 ORDER BY [if requested]
 ```
 
-**Example:**
+**Example 1 - With User-Requested Dimensions:**
 
 Measure Config for CE:
 {{
   "formula": "SUM(info_value)",
-  "filters": ["info_type='CE'", "measure_code='CE'", "report_aspect IN ('CREDIT','CREDIT_ALD')"],
-  "default_group_by": ["obligor_rdm_id", "product_group_code"]
+  "filters": ["info_type='CE'", "measure_code='CE'", "report_aspect IN ('CREDIT','CREDIT_ALD')"]
 }}
 
-Dimensions: ["obligor_rdm_id"]
+User-Requested Dimensions: ["product_group_code", "report_date"]
 
 Generated SQL:
 ```sql
 SELECT
-    obligor_rdm_id,
     product_group_code,
+    report_date,
     SUM(info_value) AS current_exposure
 FROM risk_measures
 WHERE info_type='CE'
     AND measure_code='CE'
     AND report_aspect IN ('CREDIT','CREDIT_ALD')
-GROUP BY obligor_rdm_id, product_group_code
-ORDER BY obligor_rdm_id
+GROUP BY product_group_code, report_date
+ORDER BY product_group_code, report_date
+```
+
+**Example 2 - No Grouping (Aggregate Only):**
+
+Measure Config for LEQ:
+{{
+  "formula": "SUM(info_value)",
+  "filters": ["info_type='LEQ'", "measure_code='EPE'"]
+}}
+
+User-Requested Dimensions: []
+
+Generated SQL:
+```sql
+SELECT
+    SUM(info_value) AS loan_equivalent
+FROM risk_measures
+WHERE info_type='LEQ'
+    AND measure_code='EPE'
 ```
 
 Now generate the SQL statement for the given query and configurations.

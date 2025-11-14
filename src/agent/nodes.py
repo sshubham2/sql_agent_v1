@@ -261,7 +261,8 @@ def sql_generation_node(state: AgentState) -> AgentState:
 
     confirmed_query = state.get('user_confirmed_query', '')
     measure_configs = state.get('measure_configs', {})
-    dimensions = state.get('identified_dimensions', [])
+    group_by_dimensions = state.get('group_by_dimensions', [])
+    user_filters = state.get('user_filters', [])
 
     # Prepare context for LLM
     context = f"""
@@ -271,8 +272,13 @@ User's Confirmed Query:
 Measure Configurations:
 {json.dumps(measure_configs, indent=2)}
 
-Requested Dimensions:
-{', '.join(dimensions)}
+User-Requested GROUP BY Dimensions (use ONLY these):
+{', '.join(group_by_dimensions) if group_by_dimensions else 'None - calculate aggregate only'}
+
+User Filter Conditions:
+{json.dumps(user_filters, indent=2) if user_filters else 'None'}
+
+IMPORTANT: Use ONLY the dimensions listed above in the GROUP BY clause. Do NOT add any other columns.
 
 Generate the SQL statement following the constraints in the system prompt.
 """
